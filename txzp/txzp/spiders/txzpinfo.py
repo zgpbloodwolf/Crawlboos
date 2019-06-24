@@ -2,12 +2,24 @@
 import scrapy
 from txzp.items import TxzpItem
 import time
+import json
+from collections import deque
 
 
 class TxzpinfoSpider(scrapy.Spider):
     name = 'txzpinfo'
     allowed_domains = ['zhipin.com']
-    # bpth_url="https://www.zhipin.com/c101010100-p100109/?page=1&ka=page-1"
+    addque = deque()
+    majorque = deque()
+    with open('address.json','r') as f:
+        addresslist = json.loads(f.read())["address"]
+    with open('major.json','r') as f:
+        majorlist = json.loads(f.read())["major"]
+    for address in addresslist:
+        addque.append(address)
+    for major in majorlist:
+        majorque.append(major)
+    
     #城市
     # country='101010100'
     #职业
@@ -15,17 +27,11 @@ class TxzpinfoSpider(scrapy.Spider):
     #页数
     # pages='1'
     # start_urls = ['https://www.zhipin.com/c%s-p%s/?page=%s&ka=page-%s'%(country,zy,pages,pages)]
-    print(1)
     start_urls = ['https://www.zhipin.com/c101010100-p100109/?page=1&ka=page-1']
-    print(2)
     def parse(self, response):
-        print('3')
         informationlist= response.xpath('//div[@class="job-primary"]')
-        print('4')
         # inlist=[]
         for infor in informationlist:
-            print('5')
-    
             item = TxzpItem()
         	#职位
             item['posiname'] = infor.xpath('./div[@class="info-primary"]/h3/a/div/text()').extract()[0]
@@ -44,13 +50,25 @@ class TxzpinfoSpider(scrapy.Spider):
         	# item['posilink']=posilink
         	# inlist.append(item)
             yield item
-
-
         if response.xpath('//a[@class="next"]'):
-            print(123)
             time.sleep(1)
             nextlink ="https://www.zhipin.com/" + response.xpath('//a[@class="next"]/@href').extract()[0]
             yield scrapy.Request(nextlink, callback = self.parse)
+        else :
+            #如果职业不为空换职业爬取
+            if len(self.majorque)!=0:
+                maj = str(self.majorque.popleft())
+                majlink = "https://www.zhipin.com/c101010100-p"+maj+"/?page=1&ka=page-1"
+                yield scrapy.Request(majlink, callback = self.parse)
+            #如果职业为空，换地址换职业
+            else:
+                add = str(self.addque.popleft())
+                for major in self.majorlist:
+                    self.majorque.append(major)
+                maj = str(self.majorque.popleft())
+                newurl = "https://www.zhipin.com/c"+add+"-p"+maj+"/?page=1&ka=page-1"
+                yield scrapy.Request(nextlink, callback = self.parse)
+
 
 
 
